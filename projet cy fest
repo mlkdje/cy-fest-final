@@ -25,7 +25,7 @@ typedef struct {
 } GestionSalles;
 
 void afficherBordures() {
-    printf("------------------------------\n");
+    printf("------------------------------ \n");
 }
 
 void afficherMenu() {
