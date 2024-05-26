@@ -1,0 +1,332 @@
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <time.h>
+
+#define LENGTH 20
+
+typedef struct {
+    int estReserve;
+} Siege;
+
+typedef struct {
+    char nom[LENGTH];
+    char artiste[LENGTH];
+    long nbRangee;
+    long *nbSiegesParRangee;
+    Siege **sieges;
+    time_t heureFin; // Ajout de l'heure de fin du concert
+} Salle;
+
+typedef struct {
+    Salle **salles;
+    long nbsalle;
+    long capacite;
+} GestionSalles;
+
+void afficherBordures() {
+    printf("------------------------------\n");
+}
+
+void afficherMenu() {
+    afficherBordures();
+    printf("Menu principal\n");
+    afficherBordures();
+    printf("1. Mode Manager\n");
+    printf("2. Mode Festivalier\n");
+    printf("0. Quitter\n");
+    afficherBordures();
+    printf("Choisissez : ");
+}
+
+Salle *creerSalle(const char *nom, long nbRangees, long rangeeA, long rangeeB, long rangeeC) {
+    Salle *nouvelleSalle = malloc(sizeof(Salle));
+    if (!nouvelleSalle) {
+        printf("Erreur d'allocation de mémoire pour la salle.\n");
+        return NULL;
+    }
+
+    strncpy(nouvelleSalle->nom, nom, LENGTH);
+    nouvelleSalle->nom[LENGTH - 1] = '\0';
+
+    nouvelleSalle->nbRangee = nbRangees;
+    nouvelleSalle->nbSiegesParRangee = malloc(nbRangees * sizeof(long));
+    if (!nouvelleSalle->nbSiegesParRangee) {
+        printf("Erreur d'allocation de mémoire pour les sièges par rangée.\n");
+        free(nouvelleSalle);
+        return NULL;
+    }
+
+    nouvelleSalle->sieges = malloc(nbRangees * sizeof(Siege *));
+    if (!nouvelleSalle->sieges) {
+        printf("Erreur d'allocation de mémoire pour les rangées.\n");
+        free(nouvelleSalle->nbSiegesParRangee);
+        free(nouvelleSalle);
+        return NULL;
+    }
+
+    for (long i = 0; i < nbRangees; i++) {
+        long nbSieges = (i < rangeeA) ? 20 : (i < rangeeA + rangeeB) ? 50 : 100;
+        nouvelleSalle->nbSiegesParRangee[i] = nbSieges;
+        nouvelleSalle->sieges[i] = malloc(nbSieges * sizeof(Siege));
+        if (!nouvelleSalle->sieges[i]) {
+            printf("Erreur d'allocation de mémoire pour les sièges de la rangée %ld.\n", i + 1);
+            for (long j = 0; j < i; j++) {
+                free(nouvelleSalle->sieges[j]);
+            }
+            free(nouvelleSalle->sieges);
+            free(nouvelleSalle->nbSiegesParRangee);
+            free(nouvelleSalle);
+            return NULL;
+        }
+        for (long j = 0; j < nbSieges; j++) {
+            nouvelleSalle->sieges[i][j].estReserve = 0;
+        }
+    }
+
+    return nouvelleSalle;
+}
+
+void modifierdetailsalle(GestionSalles *gestion) {
+    // Code pour modifier les détails de la salle
+    // À implémenter
+}
+
+void afficherDetailSalle(GestionSalles *gestion) {
+    for (long i = 0; i < gestion->nbsalle; i++) {
+        printf("Salle %s :\n", gestion->salles[i]->nom);
+        printf("Artiste : %s\n", gestion->salles[i]->artiste);
+        printf("Nombre de rangées : %ld\n", gestion->salles[i]->nbRangee);
+        for (long j = 0; j < gestion->salles[i]->nbRangee; j++) {
+            printf("  Rangée %ld : %ld sièges\n", j + 1, gestion->salles[i]->nbSiegesParRangee[j]);
+        }
+        char heureFinStr[26];
+        ctime_r(&gestion->salles[i]->heureFin, heureFinStr);
+        printf("Heure de fin du concert : %s\n", heureFinStr);
+    }
+}
+
+Salle *saisirHeureFinConcert(Salle *salle) {
+    char heureFin[LENGTH];
+    printf("Entrez l'heure de fin du concert (HH:MM) : ");
+    if (!fgets(heureFin, LENGTH, stdin)) {
+        printf("Erreur de lecture.\n");
+        exit(5);
+    }
+
+    int heures, minutes;
+    if (sscanf(heureFin, "%d:%d", &heures, &minutes) != 2 || heures < 0 || heures > 23 || minutes < 0 || minutes > 59) {
+        printf("Format de l'heure invalide.\n");
+        exit(5);
+    }
+
+    // Obtenir l'heure actuelle
+    time_t currentTime = time(NULL);
+    struct tm *currentTM = localtime(&currentTime);
+
+    // Modifier les heures et minutes
+    currentTM->tm_hour = heures;
+    currentTM->tm_min = minutes;
+    currentTM->tm_sec = 0;
+
+    // Convertir en time_t
+    salle->heureFin = mktime(currentTM);
+
+    return salle;
+}
+
+void afficherPlanSalle(Salle *salle) {
+    printf("Plan de la salle %s :\n", salle->nom);
+    for (long i = 0; i < salle->nbRangee; i++) {
+        for (long j = 0; j < salle->nbSiegesParRangee[i]; j++) {
+            if (salle->sieges[i][j].estReserve) {
+                printf("[R]");
+            } else {
+                printf("[L]");
+            }
+        }
+        printf("\n");
+    }
+}
+
+void sauvegarderSalle(GestionSalles *gestion) {
+    FILE *fichier = fopen("gestion_salles.txt", "w");
+    if (!fichier) {
+        printf("Erreur d'ouverture de fichier\n");
+        exit(6);
+    }
+
+    fprintf(fichier, "Nombre de salles : %ld\n", gestion->nbsalle);
+    for (long i = 0; i < gestion->nbsalle; i++) {
+        fprintf(fichier, "Nom de la salle : %s\n", gestion->salles[i]->nom);
+        fprintf(fichier, "Artiste : %s\n", gestion->salles[i]->artiste);
+        fprintf(fichier, "Nombre de rangées : %ld\n", gestion->salles[i]->nbRangee);
+        for (long j = 0; j < gestion->salles[i]->nbRangee; j++) {
+            fprintf(fichier, "Nombre de sièges pour la rangée %ld : %ld\n", j + 1, gestion->salles[i]->nbSiegesParRangee[j]);
+        }
+        fprintf(fichier, "Heure de fin du concert : %ld\n", gestion->salles[i]->heureFin); // Sauvegarder l'heure de fin
+    }
+
+    fclose(fichier);
+}
+
+void saisieDonneesSalle(GestionSalles *gestion) {
+    char nom[LENGTH];
+    long nbRangees, rangeeA, rangeeB, rangeeC;
+
+    printf("Nom de la salle : ");
+    if (!fgets(nom, LENGTH, stdin)) {
+        printf("Erreur de lecture.\n");
+        return;
+    }
+    nom[strcspn(nom, "\n")] = '\0'; // Enlever le caractère de nouvelle ligne si présent
+
+    printf("Nombre de rangées : ");
+    char buffer[100];
+    if (!fgets(buffer, sizeof(buffer), stdin) || sscanf(buffer, "%ld", &nbRangees) != 1) {
+        printf("Erreur de lecture.\n");
+        return;
+    }
+
+    printf("Nombre de rangées catégorie A : ");
+    if (!fgets(buffer, sizeof(buffer), stdin) || sscanf(buffer, "%ld", &rangeeA) != 1) {
+        printf("Erreur de lecture.\n");
+        return;
+    }
+
+    printf("Nombre de rangées catégorie B : ");
+    if (!fgets(buffer, sizeof(buffer), stdin) || sscanf(buffer, "%ld", &rangeeB) != 1) {
+        printf("Erreur de lecture.\n");
+        return;
+    }
+
+    printf("Nombre de rangées catégorie C : ");
+    if (!fgets(buffer, sizeof(buffer), stdin) || sscanf(buffer, "%ld", &rangeeC) != 1) {
+        printf("Erreur de lecture.\n");
+        return;
+    }
+
+    Salle *nouvelleSalle = creerSalle(nom, nbRangees, rangeeA, rangeeB, rangeeC);
+    if (nouvelleSalle) {
+        gestion->nbsalle++;
+        gestion->salles = realloc(gestion->salles, sizeof(Salle *) * gestion->nbsalle);
+        if (!gestion->salles) {
+            printf("Erreur\n");
+            exit(7);
+        }
+        gestion->salles[gestion->nbsalle - 1] = nouvelleSalle;
+    }
+}
+
+void modeManager(GestionSalles *gestion) {
+    afficherBordures();
+    printf("Mode Manager\n");
+    afficherBordures();
+    printf("1. Ajouter une salle\n");
+    printf("2. Afficher les détails des salles\n");
+    printf("3. Modifier les détails d'une salle\n");
+    printf("4. Sauvegarder les salles\n");
+    printf("0. Retour\n");
+    afficherBordures();
+    printf("Choisissez : ");
+
+    int choix;
+    char buffer[100];
+    if (!fgets(buffer, sizeof(buffer), stdin) || sscanf(buffer, "%d", &choix) != 1) {
+        printf("Erreur de lecture.\n");
+        return;
+    }
+
+    switch (choix) {
+        case 1:
+            saisieDonneesSalle(gestion);
+            break;
+        case 2:
+            afficherDetailSalle(gestion);
+            break;
+        case 3:
+            modifierdetailsalle(gestion);
+            break;
+        case 4:
+            sauvegarderSalle(gestion);
+            break;
+        case 0:
+            break;
+        default:
+            printf("Choix invalide.\n");
+            break;
+    }
+}
+
+void modeFestivalier(GestionSalles *gestion) {
+    afficherBordures();
+    printf("Mode Festivalier\n");
+    afficherBordures();
+    printf("1. Afficher le plan des salles\n");
+    printf("0. Retour\n");
+    afficherBordures();
+    printf("Choisissez : ");
+
+    int choix;
+    char buffer[100];
+    if (!fgets(buffer, sizeof(buffer), stdin) || sscanf(buffer, "%d", &choix) != 1) {
+        printf("Erreur de lecture.\n");
+        return;
+    }
+
+    switch (choix) {
+        case 1:
+            if (gestion->nbsalle > 0) {
+                for (long i = 0; i < gestion->nbsalle; i++) {
+                    afficherPlanSalle(gestion->salles[i]);
+                }
+            } else {
+                printf("Aucune salle disponible.\n");
+            }
+            break;
+        case 0:
+            break;
+        default:
+            printf("Choix invalide.\n");
+            break;
+    }
+}
+
+void quitter() {
+    printf("Merci d'avoir utilisé le programme !\n");
+    exit(0);
+}
+
+int main() {
+    GestionSalles gestion;
+    gestion.salles = NULL;
+    gestion.nbsalle = 0;
+    gestion.capacite = 0;
+
+    int choix;
+    while (1) {
+        afficherMenu();
+        char buffer[100];
+        if (!fgets(buffer, sizeof(buffer), stdin) || sscanf(buffer, "%d", &choix) != 1) {
+            printf("Erreur de lecture.\n");
+            continue;
+        }
+
+        switch (choix) {
+            case 1:
+                modeManager(&gestion);
+                break;
+            case 2:
+                modeFestivalier(&gestion);
+                break;
+            case 0:
+                quitter();
+                break;
+            default:
+                printf("Choix invalide.\n");
+                break;
+        }
+    }
+
+    return 0;
+}
